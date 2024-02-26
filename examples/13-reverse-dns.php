@@ -14,7 +14,7 @@ if (!$config->nameservers) {
 $factory = new Factory();
 $resolver = $factory->create($config);
 
-$ip = isset($argv[1]) ? $argv[1] : '8.8.8.8';
+$ip = $argv[1] ?? '8.8.8.8';
 
 if (@inet_pton($ip) === false) {
     exit('Error: Given argument is not a valid IP' . PHP_EOL);

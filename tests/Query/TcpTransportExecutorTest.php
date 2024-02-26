@@ -32,32 +32,32 @@ class TcpTransportExecutorTest extends TestCase
 
     public static function provideDefaultPortProvider()
     {
-        return array(
-            array(
+        return [
+            [
                 '8.8.8.8',
                 'tcp://8.8.8.8:53'
-            ),
-            array(
+            ],
+            [
                 '1.2.3.4:5',
                 'tcp://1.2.3.4:5'
-            ),
-            array(
+            ],
+            [
                 'tcp://1.2.3.4',
                 'tcp://1.2.3.4:53'
-            ),
-            array(
+            ],
+            [
                 'tcp://1.2.3.4:53',
                 'tcp://1.2.3.4:53'
-            ),
-            array(
+            ],
+            [
                 '::1',
                 'tcp://[::1]:53'
-            ),
-            array(
+            ],
+            [
                 '[::1]:53',
                 'tcp://[::1]:53'
-            )
-        );
+            ]
+        ];
     }
 
     public function testCtorWithoutLoopShouldAssignDefaultLoop()

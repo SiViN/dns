@@ -14,7 +14,7 @@ if (!$config->nameservers) {
 $factory = new Factory();
 $resolver = $factory->createCached($config);
 
-$name = isset($argv[1]) ? $argv[1] : 'www.google.com';
+$name = $argv[1] ?? 'www.google.com';
 
 $resolver->resolve($name)->then(function ($ip) use ($name) {
     echo 'IP for ' . $name . ': ' . $ip . PHP_EOL;

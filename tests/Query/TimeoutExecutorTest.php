@@ -7,9 +7,10 @@ use React\Dns\Query\CancellationException;
 use React\Dns\Query\Query;
 use React\Dns\Query\TimeoutException;
 use React\Dns\Query\TimeoutExecutor;
-use React\Promise;
 use React\Promise\Deferred;
 use React\Tests\Dns\TestCase;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 
 class TimeoutExecutorTest extends TestCase
 {
@@ -78,7 +79,7 @@ class TimeoutExecutorTest extends TestCase
         $this->wrapped
             ->expects($this->once())
             ->method('query')
-            ->willReturn(Promise\resolve('0.0.0.0'));
+            ->willReturn(resolve('0.0.0.0'));
 
         $query = new Query('igor.io', Message::TYPE_A, Message::CLASS_IN);
         $promise = $this->executor->query($query);
@@ -114,7 +115,7 @@ class TimeoutExecutorTest extends TestCase
         $this->wrapped
             ->expects($this->once())
             ->method('query')
-            ->willReturn(Promise\reject(new \RuntimeException()));
+            ->willReturn(reject(new \RuntimeException()));
 
         $query = new Query('igor.io', Message::TYPE_A, Message::CLASS_IN);
         $promise = $this->executor->query($query);

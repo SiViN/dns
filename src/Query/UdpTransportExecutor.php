@@ -8,6 +8,7 @@ use React\Dns\Protocol\Parser;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
+use function React\Promise\reject;
 
 /**
  * Send DNS queries over a UDP transport.
@@ -110,7 +111,7 @@ final class UdpTransportExecutor implements ExecutorInterface
             throw new \InvalidArgumentException('Invalid nameserver address given');
         }
 
-        $this->nameserver = 'udp://' . $parts['host'] . ':' . (isset($parts['port']) ? $parts['port'] : 53);
+        $this->nameserver = 'udp://' . $parts['host'] . ':' . ($parts['port'] ?? 53);
         $this->loop = $loop ?: Loop::get();
         $this->parser = new Parser();
         $this->dumper = new BinaryDumper();
@@ -122,7 +123,7 @@ final class UdpTransportExecutor implements ExecutorInterface
 
         $queryData = $this->dumper->toBinary($request);
         if (isset($queryData[$this->maxPacketSize])) {
-            return \React\Promise\reject(new \RuntimeException(
+            return reject(new \RuntimeException(
                 'DNS query for ' . $query->describe() . ' failed: Query too large for UDP transport',
                 \defined('SOCKET_EMSGSIZE') ? \SOCKET_EMSGSIZE : 90
             ));
@@ -133,7 +134,7 @@ final class UdpTransportExecutor implements ExecutorInterface
         $errstr = '';
         $socket = @\stream_socket_client($this->nameserver, $errno, $errstr, 0);
         if ($socket === false) {
-            return \React\Promise\reject(new \RuntimeException(
+            return reject(new \RuntimeException(
                 'DNS query for ' . $query->describe() . ' failed: Unable to connect to DNS server ' . $this->nameserver . ' ('  . $errstr . ')',
                 $errno
             ));
@@ -148,8 +149,8 @@ final class UdpTransportExecutor implements ExecutorInterface
             // This can also be reproduced by writing data exceeding `stream_set_chunk_size()` to a server refusing UDP data.
             // fwrite(): send of 8192 bytes failed with errno=111 Connection refused
             \preg_match('/errno=(\d+) (.+)/', $error, $m);
-            $errno = isset($m[1]) ? (int) $m[1] : 0;
-            $errstr = isset($m[2]) ? $m[2] : $error;
+            $errno = (int) ($m[1] ?? 0);
+            $errstr = $m[2] ?? $error;
         });
 
         $written = \fwrite($socket, $queryData);
@@ -157,34 +158,30 @@ final class UdpTransportExecutor implements ExecutorInterface
         \restore_error_handler();
 
         if ($written !== \strlen($queryData)) {
-            return \React\Promise\reject(new \RuntimeException(
+            return reject(new \RuntimeException(
                 'DNS query for ' . $query->describe() . ' failed: Unable to send query to DNS server ' . $this->nameserver . ' ('  . $errstr . ')',
                 $errno
             ));
         }
 
-        $loop = $this->loop;
-        $deferred = new Deferred(function () use ($loop, $socket, $query) {
+        $deferred = new Deferred(function () use ($socket, $query) {
             // cancellation should remove socket from loop and close socket
-            $loop->removeReadStream($socket);
+            $this->loop->removeReadStream($socket);
             \fclose($socket);
 
             throw new CancellationException('DNS query for ' . $query->describe() . ' has been cancelled');
         });
 
-        $max = $this->maxPacketSize;
-        $parser = $this->parser;
-        $nameserver = $this->nameserver;
-        $loop->addReadStream($socket, function ($socket) use ($loop, $deferred, $query, $parser, $request, $max, $nameserver) {
+        $this->loop->addReadStream($socket, function ($socket) use ($deferred, $query, $request) {
             // try to read a single data packet from the DNS server
             // ignoring any errors, this is uses UDP packets and not a stream of data
-            $data = @\fread($socket, $max);
+            $data = @\fread($socket, $this->maxPacketSize);
             if ($data === false) {
                 return;
             }
 
             try {
-                $response = $parser->parseMessage($data);
+                $response = $this->parser->parseMessage($data);
             } catch (\Exception $e) {
                 // ignore and await next if we received an invalid message from remote server
                 // this may as well be a fake response from an attacker (possible DOS)
@@ -198,12 +195,12 @@ final class UdpTransportExecutor implements ExecutorInterface
             }
 
             // we only react to the first valid message, so remove socket from loop and close
-            $loop->removeReadStream($socket);
+            $this->loop->removeReadStream($socket);
             \fclose($socket);
 
             if ($response->tc) {
                 $deferred->reject(new \RuntimeException(
-                    'DNS query for ' . $query->describe() . ' failed: The DNS server ' . $nameserver . ' returned a truncated result for a UDP query',
+                    'DNS query for ' . $query->describe() . ' failed: The DNS server ' . $this->nameserver . ' returned a truncated result for a UDP query',
                     \defined('SOCKET_EMSGSIZE') ? \SOCKET_EMSGSIZE : 90
                 ));
                 return;

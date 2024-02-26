@@ -190,31 +190,31 @@ final class Message
      * An array of Query objects
      *
      * ```php
-     * $questions = array(
+     * $questions = [
      *     new Query(
      *         'reactphp.org',
      *         Message::TYPE_A,
      *         Message::CLASS_IN
      *     )
-     * );
+     * ];
      * ```
      *
      * @var Query[]
      */
-    public $questions = array();
+    public $questions = [];
 
     /**
      * @var Record[]
      */
-    public $answers = array();
+    public $answers = [];
 
     /**
      * @var Record[]
      */
-    public $authority = array();
+    public $authority = [];
 
     /**
      * @var Record[]
      */
-    public $additional = array();
+    public $additional = [];
 }

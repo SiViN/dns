@@ -13,7 +13,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $executor = new TcpTransportExecutor('8.8.8.8:53');
 
-$name = isset($argv[1]) ? $argv[1] : 'google.com';
+$name = $argv[1] ?? 'google.com';
 
 $any = new Query($name, Message::TYPE_ANY, Message::CLASS_IN);
 

@@ -8,6 +8,7 @@ use React\Dns\Protocol\Parser;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
+use function React\Promise\reject;
 
 /**
  * Send DNS queries over a TCP/IP stream transport.
@@ -90,12 +91,12 @@ class TcpTransportExecutor implements ExecutorInterface
     /**
      * @var Deferred[]
      */
-    private $pending = array();
+    private $pending = [];
 
     /**
      * @var string[]
      */
-    private $names = array();
+    private $names = [];
 
     /**
      * Maximum idle time when socket is current unused (i.e. no pending queries outstanding)
@@ -146,7 +147,7 @@ class TcpTransportExecutor implements ExecutorInterface
             throw new \InvalidArgumentException('Invalid nameserver address given');
         }
 
-        $this->nameserver = 'tcp://' . $parts['host'] . ':' . (isset($parts['port']) ? $parts['port'] : 53);
+        $this->nameserver = 'tcp://' . $parts['host'] . ':' . ($parts['port'] ?? 53);
         $this->loop = $loop ?: Loop::get();
         $this->parser = new Parser();
         $this->dumper = new BinaryDumper();
@@ -164,7 +165,7 @@ class TcpTransportExecutor implements ExecutorInterface
         $queryData = $this->dumper->toBinary($request);
         $length = \strlen($queryData);
         if ($length > 0xffff) {
-            return \React\Promise\reject(new \RuntimeException(
+            return reject(new \RuntimeException(
                 'DNS query for ' . $query->describe() . ' failed: Query too large for TCP transport'
             ));
         }
@@ -175,7 +176,7 @@ class TcpTransportExecutor implements ExecutorInterface
             // create async TCP/IP connection (may take a while)
             $socket = @\stream_socket_client($this->nameserver, $errno, $errstr, 0, \STREAM_CLIENT_CONNECT | \STREAM_CLIENT_ASYNC_CONNECT);
             if ($socket === false) {
-                return \React\Promise\reject(new \RuntimeException(
+                return reject(new \RuntimeException(
                     'DNS query for ' . $query->describe() . ' failed: Unable to connect to DNS server ' . $this->nameserver . ' ('  . $errstr . ')',
                     $errno
                 ));
@@ -198,16 +199,14 @@ class TcpTransportExecutor implements ExecutorInterface
         $this->writeBuffer .= $queryData;
         if (!$this->writePending) {
             $this->writePending = true;
-            $this->loop->addWriteStream($this->socket, array($this, 'handleWritable'));
+            $this->loop->addWriteStream($this->socket, [$this, 'handleWritable']);
         }
 
-        $names =& $this->names;
-        $that = $this;
-        $deferred = new Deferred(function () use ($that, &$names, $request) {
+        $deferred = new Deferred(function () use ($request) {
             // remove from list of pending names, but remember pending query
-            $name = $names[$request->id];
-            unset($names[$request->id]);
-            $that->checkIdle();
+            $name = $this->names[$request->id];
+            unset($this->names[$request->id]);
+            $this->checkIdle();
 
             throw new CancellationException('DNS query for ' . $name . ' has been cancelled');
         });
@@ -243,7 +242,7 @@ class TcpTransportExecutor implements ExecutorInterface
             }
 
             $this->readPending = true;
-            $this->loop->addReadStream($this->socket, array($this, 'handleRead'));
+            $this->loop->addReadStream($this->socket, [$this, 'handleRead']);
         }
 
         $errno = 0;
@@ -252,8 +251,8 @@ class TcpTransportExecutor implements ExecutorInterface
             // Match errstr from PHP's warning message.
             // fwrite(): Send of 327712 bytes failed with errno=32 Broken pipe
             \preg_match('/errno=(\d+) (.+)/', $error, $m);
-            $errno = isset($m[1]) ? (int) $m[1] : 0;
-            $errstr = isset($m[2]) ? $m[2] : $error;
+            $errno = (int) ($m[1] ?? 0);
+            $errstr = $m[2] ?? $error;
         });
 
         $written = \fwrite($this->socket, $this->writeBuffer);
@@ -360,7 +359,7 @@ class TcpTransportExecutor implements ExecutorInterface
                 $code
             ));
         }
-        $this->pending = $this->names = array();
+        $this->pending = $this->names = [];
     }
 
     /**
@@ -369,9 +368,8 @@ class TcpTransportExecutor implements ExecutorInterface
     public function checkIdle()
     {
         if ($this->idleTimer === null && !$this->names) {
-            $that = $this;
-            $this->idleTimer = $this->loop->addTimer($this->idlePeriod, function () use ($that) {
-                $that->closeError('Idle timeout');
+            $this->idleTimer = $this->loop->addTimer($this->idlePeriod, function () {
+                $this->closeError('Idle timeout');
             });
         }
     }
