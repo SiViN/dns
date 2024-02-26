@@ -117,10 +117,6 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryRejectsIfServerConnectionFails()
     {
-        if (defined('HHVM_VERSION')) {
-            $this->markTestSkipped('HHVM reports different error message for invalid addresses');
-        }
-
         $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
         $loop->expects($this->never())->method('addWriteStream');
 
@@ -403,11 +399,11 @@ class TcpTransportExecutorTest extends TestCase
         restore_error_handler();
         $this->assertNull($error);
 
-        // expect EPIPE (Broken pipe), except for macOS kernel race condition or legacy HHVM
+        // expect EPIPE (Broken pipe), except for macOS kernel race condition
         $this->setExpectedException(
             'RuntimeException',
             'Unable to send query to DNS server tcp://' . $address . ' (',
-            defined('SOCKET_EPIPE') && !defined('HHVM_VERSION') ? (PHP_OS !== 'Darwin' || $writePending ? SOCKET_EPIPE : SOCKET_EPROTOTYPE) : null
+            defined('SOCKET_EPIPE') ? (PHP_OS !== 'Darwin' || $writePending ? SOCKET_EPIPE : SOCKET_EPROTOTYPE) : null
         );
         throw $exception;
     }
