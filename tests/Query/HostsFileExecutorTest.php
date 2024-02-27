@@ -2,10 +2,12 @@
 
 namespace React\Tests\Dns\Query;
 
-use React\Tests\Dns\TestCase;
+use React\Dns\Config\HostsFile;
+use React\Dns\Model\Message;
+use React\Dns\Query\ExecutorInterface;
 use React\Dns\Query\HostsFileExecutor;
 use React\Dns\Query\Query;
-use React\Dns\Model\Message;
+use React\Tests\Dns\TestCase;
 
 class HostsFileExecutorTest extends TestCase
 {
@@ -18,8 +20,8 @@ class HostsFileExecutorTest extends TestCase
      */
     public function setUpMocks()
     {
-        $this->hosts = $this->getMockBuilder('React\Dns\Config\HostsFile')->disableOriginalConstructor()->getMock();
-        $this->fallback = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $this->hosts = $this->createMock(HostsFile::class);
+        $this->fallback = $this->createMock(ExecutorInterface::class);
         $this->executor = new HostsFileExecutor($this->hosts, $this->fallback);
     }
 

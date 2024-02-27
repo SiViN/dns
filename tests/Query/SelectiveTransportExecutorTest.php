@@ -3,11 +3,14 @@
 namespace React\Tests\Dns\Query;
 
 use React\Dns\Model\Message;
+use React\Dns\Query\ExecutorInterface;
 use React\Dns\Query\Query;
 use React\Dns\Query\SelectiveTransportExecutor;
 use React\Promise\Deferred;
 use React\Promise\Promise;
 use React\Tests\Dns\TestCase;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 
 class SelectiveTransportExecutorTest extends TestCase
 {
@@ -20,8 +23,8 @@ class SelectiveTransportExecutorTest extends TestCase
      */
     public function setUpMocks()
     {
-        $this->datagram = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $this->stream = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $this->datagram = $this->createMock(ExecutorInterface::class);
+        $this->stream = $this->createMock(ExecutorInterface::class);
 
         $this->executor = new SelectiveTransportExecutor($this->datagram, $this->stream);
     }
@@ -36,7 +39,7 @@ class SelectiveTransportExecutorTest extends TestCase
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\resolve($response));
+            ->willReturn(resolve($response));
 
         $this->stream
             ->expects($this->never())
@@ -57,13 +60,13 @@ class SelectiveTransportExecutorTest extends TestCase
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
+            ->willReturn(reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
 
         $this->stream
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\resolve($response));
+            ->willReturn(resolve($response));
 
         $promise = $this->executor->query($query);
 
@@ -78,7 +81,7 @@ class SelectiveTransportExecutorTest extends TestCase
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException()));
+            ->willReturn(reject(new \RuntimeException()));
 
         $this->stream
             ->expects($this->never())
@@ -97,13 +100,13 @@ class SelectiveTransportExecutorTest extends TestCase
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
+            ->willReturn(reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
 
         $this->stream
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException()));
+            ->willReturn(reject(new \RuntimeException()));
 
         $promise = $this->executor->query($query);
 
@@ -216,13 +219,13 @@ class SelectiveTransportExecutorTest extends TestCase
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
+            ->willReturn(reject(new \RuntimeException('', defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90)));
 
         $this->stream
             ->expects($this->once())
             ->method('query')
             ->with($query)
-            ->willReturn(\React\Promise\reject(new \RuntimeException()));
+            ->willReturn(reject(new \RuntimeException()));
 
         while (gc_collect_cycles()) {
             // collect all garbage cycles

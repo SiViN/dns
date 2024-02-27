@@ -4,9 +4,12 @@ namespace React\Tests\Dns\Query;
 
 use React\Dns\Model\Message;
 use React\Dns\Query\CancellationException;
+use React\Dns\Query\ExecutorInterface;
 use React\Dns\Query\Query;
 use React\Dns\Query\TimeoutException;
 use React\Dns\Query\TimeoutExecutor;
+use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Tests\Dns\TestCase;
 use function React\Promise\reject;
@@ -23,9 +26,9 @@ class TimeoutExecutorTest extends TestCase
      */
     public function setUpExecutor()
     {
-        $this->wrapped = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $this->wrapped = $this->createMock(ExecutorInterface::class);
 
-        $this->loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $this->loop = $this->createMock(LoopInterface::class);
 
         $this->executor = new TimeoutExecutor($this->wrapped, 5.0, $this->loop);
     }
@@ -38,12 +41,12 @@ class TimeoutExecutorTest extends TestCase
         $ref->setAccessible(true);
         $loop = $ref->getValue($executor);
 
-        $this->assertInstanceOf('React\EventLoop\LoopInterface', $loop);
+        $this->assertInstanceOf(LoopInterface::class, $loop);
     }
 
     public function testCancellingPromiseWillCancelWrapped()
     {
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $this->loop->expects($this->once())->method('addTimer')->with(5.0, $this->anything())->willReturn($timer);
         $this->loop->expects($this->once())->method('cancelTimer')->with($timer);
 
@@ -89,7 +92,7 @@ class TimeoutExecutorTest extends TestCase
 
     public function testResolvesPromiseAfterCancellingTimerWhenWrappedReturnsPendingPromiseThatResolves()
     {
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $this->loop->expects($this->once())->method('addTimer')->with(5.0, $this->anything())->willReturn($timer);
         $this->loop->expects($this->once())->method('cancelTimer')->with($timer);
 
@@ -125,7 +128,7 @@ class TimeoutExecutorTest extends TestCase
 
     public function testRejectsPromiseAfterCancellingTimerWhenWrappedReturnsPendingPromiseThatRejects()
     {
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $this->loop->expects($this->once())->method('addTimer')->with(5.0, $this->anything())->willReturn($timer);
         $this->loop->expects($this->once())->method('cancelTimer')->with($timer);
 
@@ -146,7 +149,7 @@ class TimeoutExecutorTest extends TestCase
     public function testRejectsPromiseAndCancelsPendingQueryWhenTimeoutTriggers()
     {
         $timerCallback = null;
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $this->loop->expects($this->once())->method('addTimer')->with(5.0, $this->callback(function ($callback) use (&$timerCallback) {
             $timerCallback = $callback;
             return true;
@@ -183,7 +186,7 @@ class TimeoutExecutorTest extends TestCase
         });
 
         assert($exception instanceof TimeoutException);
-        $this->assertInstanceOf('React\Dns\Query\TimeoutException', $exception);
+        $this->assertInstanceOf(TimeoutException::class, $exception);
         $this->assertEquals('DNS query for igor.io (A) timed out' , $exception->getMessage());
     }
 }

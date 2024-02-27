@@ -5,10 +5,16 @@ namespace React\Tests\Dns\Query;
 use React\Dns\Model\Message;
 use React\Dns\Protocol\BinaryDumper;
 use React\Dns\Protocol\Parser;
+use React\Dns\Query\CancellationException;
 use React\Dns\Query\Query;
 use React\Dns\Query\UdpTransportExecutor;
 use React\EventLoop\Loop;
+use React\EventLoop\LoopInterface;
+use React\Promise\PromiseInterface;
 use React\Tests\Dns\TestCase;
+use function React\Async\await;
+use function React\Promise\Timer\sleep;
+use function React\Promise\Timer\timeout;
 
 class UdpTransportExecutorTest extends TestCase
 {
@@ -19,7 +25,7 @@ class UdpTransportExecutorTest extends TestCase
      */
     public function testCtorShouldAcceptNameserverAddresses($input, $expected)
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $executor = new UdpTransportExecutor($input, $loop);
 
@@ -32,31 +38,29 @@ class UdpTransportExecutorTest extends TestCase
 
     public static function provideDefaultPortProvider()
     {
-        return [
-            [
-                '8.8.8.8',
-                'udp://8.8.8.8:53'
-            ],
-            [
-                '1.2.3.4:5',
-                'udp://1.2.3.4:5'
-            ],
-            [
-                'udp://1.2.3.4',
-                'udp://1.2.3.4:53'
-            ],
-            [
-                'udp://1.2.3.4:53',
-                'udp://1.2.3.4:53'
-            ],
-            [
-                '::1',
-                'udp://[::1]:53'
-            ],
-            [
-                '[::1]:53',
-                'udp://[::1]:53'
-            ]
+        yield [
+            '8.8.8.8',
+            'udp://8.8.8.8:53'
+        ];
+        yield [
+            '1.2.3.4:5',
+            'udp://1.2.3.4:5'
+        ];
+        yield [
+            'udp://1.2.3.4',
+            'udp://1.2.3.4:53'
+        ];
+        yield [
+            'udp://1.2.3.4:53',
+            'udp://1.2.3.4:53'
+        ];
+        yield [
+            '::1',
+            'udp://[::1]:53'
+        ];
+        yield [
+            '[::1]:53',
+            'udp://[::1]:53'
         ];
     }
 
@@ -68,36 +72,36 @@ class UdpTransportExecutorTest extends TestCase
         $ref->setAccessible(true);
         $loop = $ref->getValue($executor);
 
-        $this->assertInstanceOf('React\EventLoop\LoopInterface', $loop);
+        $this->assertInstanceOf(LoopInterface::class, $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverAddressIsInvalid()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new UdpTransportExecutor('///', $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverAddressContainsHostname()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new UdpTransportExecutor('localhost', $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverSchemeIsInvalid()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new UdpTransportExecutor('tcp://1.2.3.4', $loop);
     }
 
     public function testQueryRejectsIfMessageExceedsUdpSize()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->never())->method('addReadStream');
 
         $executor = new UdpTransportExecutor('8.8.8.8:53', $loop);
@@ -105,15 +109,15 @@ class UdpTransportExecutorTest extends TestCase
         $query = new Query('google.' . str_repeat('.com', 200), Message::TYPE_A, Message::CLASS_IN);
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
 
         $exception = null;
         $promise->then(null, function ($reason) use (&$exception) {
             $exception = $reason;
         });
 
-        $this->setExpectedException(
-            'RuntimeException',
+        $this->expectException(
+            \RuntimeException::class,
             'DNS query for ' . $query->name . ' (A) failed: Query too large for UDP transport',
             defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90
         );
@@ -122,7 +126,7 @@ class UdpTransportExecutorTest extends TestCase
 
     public function testQueryRejectsIfServerConnectionFails()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->never())->method('addReadStream');
 
         $executor = new UdpTransportExecutor('::1', $loop);
@@ -134,15 +138,15 @@ class UdpTransportExecutorTest extends TestCase
         $query = new Query('google.com', Message::TYPE_A, Message::CLASS_IN);
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
 
         $exception = null;
         $promise->then(null, function ($reason) use (&$exception) {
             $exception = $reason;
         });
 
-        $this->setExpectedException(
-            'RuntimeException',
+        $this->expectException(
+            \RuntimeException::class,
             'DNS query for google.com (A) failed: Unable to connect to DNS server /// (Failed to parse address "///")'
         );
         throw $exception;
@@ -150,7 +154,7 @@ class UdpTransportExecutorTest extends TestCase
 
     public function testQueryRejectsIfSendToServerFailsAfterConnectionWithoutCallingCustomErrorHandler()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->never())->method('addReadStream');
 
         $executor = new UdpTransportExecutor('0.0.0.0', $loop);
@@ -171,7 +175,7 @@ class UdpTransportExecutorTest extends TestCase
         restore_error_handler();
         $this->assertNull($error);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
 
         $exception = null;
         $promise->then(null, function ($reason) use (&$exception) {
@@ -179,8 +183,8 @@ class UdpTransportExecutorTest extends TestCase
         });
 
         // ECONNREFUSED (Connection refused) on Linux, EMSGSIZE (Message too long) on macOS
-        $this->setExpectedException(
-            'RuntimeException',
+        $this->expectException(
+            \RuntimeException::class,
             'DNS query for ' . $query->name . ' (A) failed: Unable to send query to DNS server udp://0.0.0.0:53 ('
         );
         throw $exception;
@@ -190,7 +194,7 @@ class UdpTransportExecutorTest extends TestCase
     {
         $socket = null;
         $callback = null;
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addReadStream')->with($this->callback(function ($ref) use (&$socket) {
             $socket = $ref;
             return true;
@@ -207,7 +211,7 @@ class UdpTransportExecutorTest extends TestCase
         $this->assertNotNull($socket);
         $callback($socket);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
 
         $pending = true;
         $promise->then(function () use (&$pending) {
@@ -224,7 +228,7 @@ class UdpTransportExecutorTest extends TestCase
      */
     public function testQueryRejectsOnCancellation()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->once())->method('removeReadStream');
 
@@ -240,7 +244,7 @@ class UdpTransportExecutorTest extends TestCase
         });
 
         /** @var \React\Dns\Query\CancellationException $exception */
-        $this->assertInstanceOf('React\Dns\Query\CancellationException', $exception);
+        $this->assertInstanceOf(CancellationException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) has been cancelled', $exception->getMessage());
     }
 
@@ -268,7 +272,7 @@ class UdpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.2));
+        await(sleep(0.2));
         $this->assertTrue($wait);
 
         $promise->cancel();
@@ -305,7 +309,7 @@ class UdpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.2));
+        await(sleep(0.2));
         $this->assertTrue($wait);
 
         $promise->cancel();
@@ -336,12 +340,12 @@ class UdpTransportExecutorTest extends TestCase
 
         $promise = $executor->query($query);
 
-        $this->setExpectedException(
-            'RuntimeException',
+        $this->expectException(
+            \RuntimeException::class,
             'DNS query for google.com (A) failed: The DNS server udp://' . $address . ' returned a truncated result for a UDP query',
             defined('SOCKET_EMSGSIZE') ? SOCKET_EMSGSIZE : 90
         );
-        \React\Async\await(\React\Promise\Timer\timeout($promise, 0.1));
+        await(timeout($promise, 0.1));
     }
 
     public function testQueryResolvesIfServerSendsValidResponse()
@@ -367,8 +371,8 @@ class UdpTransportExecutorTest extends TestCase
         $query = new Query('google.com', Message::TYPE_A, Message::CLASS_IN);
 
         $promise = $executor->query($query);
-        $response = \React\Async\await(\React\Promise\Timer\timeout($promise, 0.2));
+        $response = await(timeout($promise, 0.2));
 
-        $this->assertInstanceOf('React\Dns\Model\Message', $response);
+        $this->assertInstanceOf(Message::class, $response);
     }
 }

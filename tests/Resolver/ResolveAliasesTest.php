@@ -2,10 +2,12 @@
 
 namespace React\Tests\Dns\Resolver;
 
-use React\Tests\Dns\TestCase;
-use React\Dns\Resolver\Resolver;
 use React\Dns\Model\Message;
 use React\Dns\Model\Record;
+use React\Dns\Query\ExecutorInterface;
+use React\Dns\Resolver\Resolver;
+use React\Tests\Dns\TestCase;
+use function React\Promise\resolve;
 
 class ResolveAliasesTest extends TestCase
 {
@@ -20,7 +22,7 @@ class ResolveAliasesTest extends TestCase
         }
 
         $executor = $this->createExecutorMock();
-        $executor->expects($this->once())->method('query')->willReturn(\React\Promise\resolve($message));
+        $executor->expects($this->once())->method('query')->willReturn(resolve($message));
 
         $resolver = new Resolver($executor);
 
@@ -31,67 +33,65 @@ class ResolveAliasesTest extends TestCase
 
     public function provideAliasedAnswers()
     {
-        return [
+        yield [
+            ['178.79.169.131'],
             [
-                ['178.79.169.131'],
-                [
-                    new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
             ],
+            'igor.io',
+        ];
+        yield [
+            ['178.79.169.131', '178.79.169.132', '178.79.169.133'],
             [
-                ['178.79.169.131', '178.79.169.132', '178.79.169.133'],
-                [
-                    new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                    new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.132'),
-                    new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.133'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
+                new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.132'),
+                new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.133'),
             ],
+            'igor.io',
+        ];
+        yield [
+            ['178.79.169.131'],
             [
-                ['178.79.169.131'],
-                [
-                    new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                    new Record('foo.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                    new Record('bar.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
+                new Record('foo.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
+                new Record('bar.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
             ],
+            'igor.io',
+        ];
+        yield [
+            ['178.79.169.131'],
             [
-                ['178.79.169.131'],
-                [
-                    new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
-                    new Record('foo.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
+                new Record('foo.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
             ],
+            'igor.io',
+        ];
+        yield [
+            ['178.79.169.131'],
             [
-                ['178.79.169.131'],
-                [
-                    new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
-                    new Record('foo.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'bar.igor.io'),
-                    new Record('bar.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
+                new Record('foo.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'bar.igor.io'),
+                new Record('bar.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
             ],
+            'igor.io',
+        ];
+        yield [
+            ['178.79.169.131', '178.79.169.132', '178.79.169.133'],
             [
-                ['178.79.169.131', '178.79.169.132', '178.79.169.133'],
-                [
-                    new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
-                    new Record('foo.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'bar.igor.io'),
-                    new Record('bar.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'baz.igor.io'),
-                    new Record('bar.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'qux.igor.io'),
-                    new Record('baz.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
-                    new Record('baz.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.132'),
-                    new Record('qux.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.133'),
-                ],
-                'igor.io',
+                new Record('igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'foo.igor.io'),
+                new Record('foo.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'bar.igor.io'),
+                new Record('bar.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'baz.igor.io'),
+                new Record('bar.igor.io', Message::TYPE_CNAME, Message::CLASS_IN, 3600, 'qux.igor.io'),
+                new Record('baz.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.131'),
+                new Record('baz.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.132'),
+                new Record('qux.igor.io', Message::TYPE_A, Message::CLASS_IN, 3600, '178.79.169.133'),
             ],
+            'igor.io',
         ];
     }
 
     private function createExecutorMock()
     {
-        return $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        return $this->createMock(ExecutorInterface::class);
     }
 }

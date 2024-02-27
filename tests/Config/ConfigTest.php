@@ -2,8 +2,8 @@
 
 namespace React\Tests\Dns\Config;
 
-use React\Tests\Dns\TestCase;
 use React\Dns\Config\Config;
+use React\Tests\Dns\TestCase;
 
 class ConfigTest extends TestCase
 {
@@ -11,7 +11,7 @@ class ConfigTest extends TestCase
     {
         $config = Config::loadSystemConfigBlocking();
 
-        $this->assertInstanceOf('React\Dns\Config\Config', $config);
+        $this->assertInstanceOf(Config::class, $config);
     }
 
     public function testLoadsDefaultPath()
@@ -22,7 +22,7 @@ class ConfigTest extends TestCase
 
         $config = Config::loadResolvConfBlocking();
 
-        $this->assertInstanceOf('React\Dns\Config\Config', $config);
+        $this->assertInstanceOf(Config::class, $config);
     }
 
     public function testLoadsFromExplicitPath()
@@ -34,7 +34,7 @@ class ConfigTest extends TestCase
 
     public function testLoadThrowsWhenPathIsInvalid()
     {
-        $this->setExpectedException('RuntimeException');
+        $this->expectException(\RuntimeException::class);
         Config::loadResolvConfBlocking(__DIR__ . '/invalid.conf');
     }
 
@@ -115,7 +115,7 @@ nameserver localhost
 
         $config = Config::loadWmicBlocking();
 
-        $this->assertInstanceOf('React\Dns\Config\Config', $config);
+        $this->assertInstanceOf(Config::class, $config);
     }
 
     public function testLoadsSingleEntryFromWmicOutput()

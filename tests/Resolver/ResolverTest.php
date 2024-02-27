@@ -2,12 +2,13 @@
 
 namespace React\Tests\Dns\Resolver;
 
-use React\Dns\Resolver\Resolver;
-use React\Dns\Query\Query;
 use React\Dns\Model\Message;
 use React\Dns\Model\Record;
-use React\Tests\Dns\TestCase;
+use React\Dns\Query\ExecutorInterface;
+use React\Dns\Query\Query;
 use React\Dns\RecordNotFoundException;
+use React\Dns\Resolver\Resolver;
+use React\Tests\Dns\TestCase;
 use function React\Promise\resolve;
 
 class ResolverTest extends TestCase
@@ -19,7 +20,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -40,7 +41,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -61,7 +62,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -83,7 +84,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -108,7 +109,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -129,7 +130,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -139,7 +140,7 @@ class ResolverTest extends TestCase
                 return resolve($response);
             }));
 
-        $errback = $this->expectCallableOnceWith($this->isInstanceOf('React\Dns\RecordNotFoundException'));
+        $errback = $this->expectCallableOnceWith($this->isInstanceOf(RecordNotFoundException::class));
 
         $resolver = new Resolver($executor);
         $resolver->resolve('igor.io')->then($this->expectCallableNever(), $errback);
@@ -154,7 +155,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
                 $response = new Message();
                 $response->qr = true;
@@ -173,31 +174,29 @@ class ResolverTest extends TestCase
 
     public function provideRcodeErrors()
     {
-        return [
-            [
-                Message::RCODE_FORMAT_ERROR,
-                'DNS query for example.com (A) returned an error response (Format Error)',
-            ],
-            [
-                Message::RCODE_SERVER_FAILURE,
-                'DNS query for example.com (A) returned an error response (Server Failure)',
-            ],
-            [
-                Message::RCODE_NAME_ERROR,
-                'DNS query for example.com (A) returned an error response (Non-Existent Domain / NXDOMAIN)'
-            ],
-            [
-                Message::RCODE_NOT_IMPLEMENTED,
-                'DNS query for example.com (A) returned an error response (Not Implemented)'
-            ],
-            [
-                Message::RCODE_REFUSED,
-                'DNS query for example.com (A) returned an error response (Refused)'
-            ],
-            [
-                99,
-                'DNS query for example.com (A) returned an error response (Unknown error response code 99)'
-            ]
+        yield  [
+            Message::RCODE_FORMAT_ERROR,
+            'DNS query for example.com (A) returned an error response (Format Error)',
+        ];
+        yield [
+            Message::RCODE_SERVER_FAILURE,
+            'DNS query for example.com (A) returned an error response (Server Failure)',
+        ];
+        yield [
+            Message::RCODE_NAME_ERROR,
+            'DNS query for example.com (A) returned an error response (Non-Existent Domain / NXDOMAIN)'
+        ];
+        yield [
+            Message::RCODE_NOT_IMPLEMENTED,
+            'DNS query for example.com (A) returned an error response (Not Implemented)'
+        ];
+        yield [
+            Message::RCODE_REFUSED,
+            'DNS query for example.com (A) returned an error response (Refused)'
+        ];
+        yield [
+            99,
+            'DNS query for example.com (A) returned an error response (Unknown error response code 99)'
         ];
     }
 
@@ -211,7 +210,7 @@ class ResolverTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) use ($code) {
                 $response = new Message();
                 $response->qr = true;
@@ -231,6 +230,6 @@ class ResolverTest extends TestCase
 
     private function createExecutorMock()
     {
-        return $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        return $this->createMock(ExecutorInterface::class);
     }
 }

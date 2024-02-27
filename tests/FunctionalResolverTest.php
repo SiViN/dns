@@ -2,8 +2,10 @@
 
 namespace React\Tests\Dns;
 
-use React\Dns\Resolver\Factory;
 use React\Dns\Model\Message;
+use React\Dns\Query\CancellationException;
+use React\Dns\RecordNotFoundException;
+use React\Dns\Resolver\Factory;
 use React\EventLoop\Loop;
 
 class FunctionalResolverTest extends TestCase
@@ -116,7 +118,7 @@ class FunctionalResolverTest extends TestCase
         });
 
         /** @var \React\Dns\RecordNotFoundException $exception */
-        $this->assertInstanceOf('React\Dns\RecordNotFoundException', $exception);
+        $this->assertInstanceOf(RecordNotFoundException::class, $exception);
         $this->assertEquals('DNS query for example.invalid (A) returned an error response (Non-Existent Domain / NXDOMAIN)', $exception->getMessage());
         $this->assertEquals(Message::RCODE_NAME_ERROR, $exception->getCode());
     }
@@ -138,7 +140,7 @@ class FunctionalResolverTest extends TestCase
         });
 
         /** @var \React\Dns\Query\CancellationException $exception */
-        $this->assertInstanceOf('React\Dns\Query\CancellationException', $exception);
+        $this->assertInstanceOf(CancellationException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) has been cancelled', $exception->getMessage());
     }
 
@@ -157,7 +159,7 @@ class FunctionalResolverTest extends TestCase
         });
 
         /** @var \React\Dns\RecordNotFoundException $exception */
-        $this->assertInstanceOf('React\Dns\RecordNotFoundException', $exception);
+        $this->assertInstanceOf(RecordNotFoundException::class, $exception);
         $this->assertEquals('DNS query for google.com (PTR) did not return a valid answer (NOERROR / NODATA)', $exception->getMessage());
         $this->assertEquals(0, $exception->getCode());
     }

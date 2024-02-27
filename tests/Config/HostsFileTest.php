@@ -2,8 +2,8 @@
 
 namespace React\Tests\Dns\Config;
 
-use React\Tests\Dns\TestCase;
 use React\Dns\Config\HostsFile;
+use React\Tests\Dns\TestCase;
 
 class HostsFileTest extends TestCase
 {
@@ -11,7 +11,7 @@ class HostsFileTest extends TestCase
     {
         $hosts = HostsFile::loadFromPathBlocking();
 
-        $this->assertInstanceOf('React\Dns\Config\HostsFile', $hosts);
+        $this->assertInstanceOf(HostsFile::class, $hosts);
     }
 
     public function testDefaultShouldHaveLocalhostMapped()
@@ -27,7 +27,7 @@ class HostsFileTest extends TestCase
 
     public function testLoadThrowsForInvalidPath()
     {
-        $this->setExpectedException('RuntimeException');
+        $this->expectException(\RuntimeException::class);
         HostsFile::loadFromPathBlocking('does/not/exist');
     }
 
