@@ -9,7 +9,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $executor = new UdpTransportExecutor('8.8.8.8:53');
 
-$name = isset($argv[1]) ? $argv[1] : 'www.google.com';
+$name = $argv[1] ?? 'www.google.com';
 
 $ipv4Query = new Query($name, Message::TYPE_A, Message::CLASS_IN);
 $ipv6Query = new Query($name, Message::TYPE_AAAA, Message::CLASS_IN);

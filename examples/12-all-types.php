@@ -16,8 +16,8 @@ if (!$config->nameservers) {
 $factory = new Factory();
 $resolver = $factory->create($config);
 
-$name = isset($argv[1]) ? $argv[1] : 'google.com';
-$type = constant('React\Dns\Model\Message::TYPE_' . (isset($argv[2]) ? $argv[2] : 'TXT'));
+$name = $argv[1] ?? 'google.com';
+$type = constant('React\Dns\Model\Message::TYPE_' . ($argv[2] ?? 'TXT'));
 
 $resolver->resolveAll($name, $type)->then(function (array $values) {
     var_dump($values);

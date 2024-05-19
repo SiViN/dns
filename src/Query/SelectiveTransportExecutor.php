@@ -63,15 +63,14 @@ class SelectiveTransportExecutor implements ExecutorInterface
 
     public function query(Query $query)
     {
-        $stream = $this->streamExecutor;
         $pending = $this->datagramExecutor->query($query);
 
-        return new Promise(function ($resolve, $reject) use (&$pending, $stream, $query) {
+        return new Promise(function ($resolve, $reject) use (&$pending, $query) {
             $pending->then(
                 $resolve,
-                function ($e) use (&$pending, $stream, $query, $resolve, $reject) {
+                function ($e) use (&$pending, $query, $resolve, $reject) {
                     if ($e->getCode() === (\defined('SOCKET_EMSGSIZE') ? \SOCKET_EMSGSIZE : 90)) {
-                        $pending = $stream->query($query)->then($resolve, $reject);
+                        $pending = $this->streamExecutor->query($query)->then($resolve, $reject);
                     } else {
                         $reject($e);
                     }

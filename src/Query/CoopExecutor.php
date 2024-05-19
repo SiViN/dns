@@ -37,8 +37,8 @@ use React\Promise\Promise;
 final class CoopExecutor implements ExecutorInterface
 {
     private $executor;
-    private $pending = array();
-    private $counts = array();
+    private $pending = [];
+    private $counts = [];
 
     public function __construct(ExecutorInterface $base)
     {
@@ -58,25 +58,21 @@ final class CoopExecutor implements ExecutorInterface
             $this->pending[$key] = $promise;
             $this->counts[$key] = 1;
 
-            $pending =& $this->pending;
-            $counts =& $this->counts;
-            $promise->then(function () use ($key, &$pending, &$counts) {
-                unset($pending[$key], $counts[$key]);
-            }, function () use ($key, &$pending, &$counts) {
-                unset($pending[$key], $counts[$key]);
+            $promise->then(function () use ($key) {
+                unset($this->pending[$key], $this->counts[$key]);
+            }, function () use ($key) {
+                unset($this->pending[$key], $this->counts[$key]);
             });
         }
 
         // Return a child promise awaiting the pending query.
         // Cancelling this child promise should only cancel the pending query
         // when no other child promise is awaiting the same query.
-        $pending =& $this->pending;
-        $counts =& $this->counts;
         return new Promise(function ($resolve, $reject) use ($promise) {
             $promise->then($resolve, $reject);
-        }, function () use (&$promise, $key, $query, &$pending, &$counts) {
-            if (--$counts[$key] < 1) {
-                unset($pending[$key], $counts[$key]);
+        }, function () use (&$promise, $key, $query) {
+            if (--$this->counts[$key] < 1) {
+                unset($this->pending[$key], $this->counts[$key]);
                 $promise->cancel();
                 $promise = null;
             }

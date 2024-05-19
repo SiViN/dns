@@ -3,10 +3,14 @@
 namespace React\Tests\Dns\Query;
 
 use React\Dns\Model\Message;
+use React\Dns\Query\ExecutorInterface;
 use React\Dns\Query\FallbackExecutor;
 use React\Dns\Query\Query;
 use React\Promise\Promise;
+use React\Promise\PromiseInterface;
 use React\Tests\Dns\TestCase;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 
 class FallbackExecutorTest extends TestCase
 {
@@ -14,16 +18,16 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $primary = $this->createMock(ExecutorInterface::class);
         $primary->expects($this->once())->method('query')->with($query)->willReturn(new Promise(function () { }));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
         $promise->then($this->expectCallableNever(), $this->expectCallableNever());
     }
 
@@ -31,34 +35,34 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\resolve(new Message()));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(resolve(new Message()));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
-        $promise->then($this->expectCallableOnceWith($this->isInstanceOf('React\Dns\Model\Message')), $this->expectCallableNever());
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
+        $promise->then($this->expectCallableOnceWith($this->isInstanceOf(Message::class)), $this->expectCallableNever());
     }
 
     public function testQueryWillReturnPendingPromiseWhenPrimaryExecutorRejectsPromiseAndSecondaryExecutorIsStillPending()
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException()));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException()));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
         $secondary->expects($this->once())->method('query')->with($query)->willReturn(new Promise(function () { }));
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
         $promise->then($this->expectCallableNever(), $this->expectCallableNever());
     }
 
@@ -66,43 +70,43 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException()));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException()));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $secondary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\resolve(new Message()));
+        $secondary = $this->createMock(ExecutorInterface::class);
+        $secondary->expects($this->once())->method('query')->with($query)->willReturn(resolve(new Message()));
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
-        $promise->then($this->expectCallableOnceWith($this->isInstanceOf('React\Dns\Model\Message')), $this->expectCallableNever());
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
+        $promise->then($this->expectCallableOnceWith($this->isInstanceOf(Message::class)), $this->expectCallableNever());
     }
 
     public function testQueryWillRejectWithExceptionMessagesConcatenatedAfterColonWhenPrimaryExecutorRejectsPromiseAndSecondaryExecutorRejectsPromiseWithMessageWithColon()
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException('DNS query for reactphp.org (A) failed: Unable to connect to DNS server A')));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException('DNS query for reactphp.org (A) failed: Unable to connect to DNS server A')));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $secondary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException('DNS query for reactphp.org (A) failed: Unable to connect to DNS server B')));
+        $secondary = $this->createMock(ExecutorInterface::class);
+        $secondary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException('DNS query for reactphp.org (A) failed: Unable to connect to DNS server B')));
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
-        $promise->then($this->expectCallableNever(), $this->expectCallableOnce($this->isInstanceOf('Exception')));
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
+        $promise->then($this->expectCallableNever(), $this->expectCallableOnce($this->isInstanceOf(\Exception::class)));
 
         $exception = null;
         $promise->then(null, function ($reason) use (&$exception) {
             $exception = $reason;
         });
 
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for reactphp.org (A) failed: Unable to connect to DNS server A. Unable to connect to DNS server B', $exception->getMessage());
     }
 
@@ -110,25 +114,25 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException('Reason A')));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException('Reason A')));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $secondary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException('Reason B')));
+        $secondary = $this->createMock(ExecutorInterface::class);
+        $secondary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException('Reason B')));
 
         $executor = new FallbackExecutor($primary, $secondary);
 
         $promise = $executor->query($query);
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
-        $promise->then($this->expectCallableNever(), $this->expectCallableOnce($this->isInstanceOf('Exception')));
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
+        $promise->then($this->expectCallableNever(), $this->expectCallableOnce($this->isInstanceOf(\Exception::class)));
 
         $exception = null;
         $promise->then(null, function ($reason) use (&$exception) {
             $exception = $reason;
         });
 
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('Reason A. Reason B', $exception->getMessage());
     }
 
@@ -136,10 +140,10 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $primary = $this->createMock(ExecutorInterface::class);
         $primary->expects($this->once())->method('query')->with($query)->willReturn(new Promise(function () { }, function () { throw new \RuntimeException(); }));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
         $secondary->expects($this->never())->method('query');
 
         $executor = new FallbackExecutor($primary, $secondary);
@@ -147,7 +151,7 @@ class FallbackExecutorTest extends TestCase
         $promise = $executor->query($query);
         $promise->cancel();
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
         $promise->then($this->expectCallableNever(), $this->expectCallableOnce());
     }
 
@@ -155,10 +159,10 @@ class FallbackExecutorTest extends TestCase
     {
         $query = new Query('reactphp.org', Message::TYPE_A, Message::CLASS_IN);
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->with($query)->willReturn(\React\Promise\reject(new \RuntimeException()));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->with($query)->willReturn(reject(new \RuntimeException()));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
         $secondary->expects($this->once())->method('query')->with($query)->willReturn(new Promise(function () { }, function () { throw new \RuntimeException(); }));
 
         $executor = new FallbackExecutor($primary, $secondary);
@@ -166,7 +170,7 @@ class FallbackExecutorTest extends TestCase
         $promise = $executor->query($query);
         $promise->cancel();
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
         $promise->then($this->expectCallableNever(), $this->expectCallableOnce());
     }
 
@@ -176,10 +180,10 @@ class FallbackExecutorTest extends TestCase
             $this->markTestSkipped('Not supported on legacy Promise v1 API');
         }
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $primary = $this->createMock(ExecutorInterface::class);
         $primary->expects($this->once())->method('query')->willReturn(new Promise(function () { }, function () { throw new \RuntimeException(); }));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
         $secondary->expects($this->never())->method('query');
 
         $executor = new FallbackExecutor($primary, $secondary);
@@ -203,10 +207,10 @@ class FallbackExecutorTest extends TestCase
             $this->markTestSkipped('Not supported on legacy Promise v1 API');
         }
 
-        $primary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
-        $primary->expects($this->once())->method('query')->willReturn(\React\Promise\reject(new \RuntimeException()));
+        $primary = $this->createMock(ExecutorInterface::class);
+        $primary->expects($this->once())->method('query')->willReturn(reject(new \RuntimeException()));
 
-        $secondary = $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        $secondary = $this->createMock(ExecutorInterface::class);
         $secondary->expects($this->once())->method('query')->willReturn(new Promise(function () { }, function () { throw new \RuntimeException(); }));
 
         $executor = new FallbackExecutor($primary, $secondary);

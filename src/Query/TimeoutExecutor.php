@@ -23,19 +23,17 @@ final class TimeoutExecutor implements ExecutorInterface
     {
         $promise = $this->executor->query($query);
 
-        $loop = $this->loop;
-        $time = $this->timeout;
-        return new Promise(function ($resolve, $reject) use ($loop, $time, $promise, $query) {
+        return new Promise(function ($resolve, $reject) use ($promise, $query) {
             $timer = null;
-            $promise = $promise->then(function ($v) use (&$timer, $loop, $resolve) {
+            $promise = $promise->then(function ($v) use (&$timer, $resolve) {
                 if ($timer) {
-                    $loop->cancelTimer($timer);
+                    $this->loop->cancelTimer($timer);
                 }
                 $timer = false;
                 $resolve($v);
-            }, function ($v) use (&$timer, $loop, $reject) {
+            }, function ($v) use (&$timer, $reject) {
                 if ($timer) {
-                    $loop->cancelTimer($timer);
+                    $this->loop->cancelTimer($timer);
                 }
                 $timer = false;
                 $reject($v);
@@ -47,7 +45,7 @@ final class TimeoutExecutor implements ExecutorInterface
             }
 
             // start timeout timer which will cancel the pending promise
-            $timer = $loop->addTimer($time, function () use ($time, &$promise, $reject, $query) {
+            $timer = $this->loop->addTimer($this->timeout, function () use (&$promise, $reject, $query) {
                 $reject(new TimeoutException(
                     'DNS query for ' . $query->describe() . ' timed out'
                 ));

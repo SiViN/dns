@@ -5,10 +5,17 @@ namespace React\Tests\Dns\Query;
 use React\Dns\Model\Message;
 use React\Dns\Protocol\BinaryDumper;
 use React\Dns\Protocol\Parser;
+use React\Dns\Query\CancellationException;
 use React\Dns\Query\Query;
 use React\Dns\Query\TcpTransportExecutor;
 use React\EventLoop\Loop;
+use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
+use React\Promise\PromiseInterface;
 use React\Tests\Dns\TestCase;
+use function React\Async\await;
+use function React\Promise\Timer\sleep;
+use function React\Promise\Timer\timeout;
 
 class TcpTransportExecutorTest extends TestCase
 {
@@ -19,7 +26,7 @@ class TcpTransportExecutorTest extends TestCase
      */
     public function testCtorShouldAcceptNameserverAddresses($input, $expected)
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $executor = new TcpTransportExecutor($input, $loop);
 
@@ -32,32 +39,30 @@ class TcpTransportExecutorTest extends TestCase
 
     public static function provideDefaultPortProvider()
     {
-        return array(
-            array(
-                '8.8.8.8',
-                'tcp://8.8.8.8:53'
-            ),
-            array(
-                '1.2.3.4:5',
-                'tcp://1.2.3.4:5'
-            ),
-            array(
-                'tcp://1.2.3.4',
-                'tcp://1.2.3.4:53'
-            ),
-            array(
-                'tcp://1.2.3.4:53',
-                'tcp://1.2.3.4:53'
-            ),
-            array(
-                '::1',
-                'tcp://[::1]:53'
-            ),
-            array(
-                '[::1]:53',
-                'tcp://[::1]:53'
-            )
-        );
+        yield [
+            '8.8.8.8',
+            'tcp://8.8.8.8:53'
+        ];
+        yield [
+            '1.2.3.4:5',
+            'tcp://1.2.3.4:5'
+        ];
+        yield [
+            'tcp://1.2.3.4',
+            'tcp://1.2.3.4:53'
+        ];
+        yield [
+            'tcp://1.2.3.4:53',
+            'tcp://1.2.3.4:53'
+        ];
+        yield [
+            '::1',
+            'tcp://[::1]:53'
+        ];
+        yield [
+            '[::1]:53',
+            'tcp://[::1]:53'
+        ];
     }
 
     public function testCtorWithoutLoopShouldAssignDefaultLoop()
@@ -68,36 +73,36 @@ class TcpTransportExecutorTest extends TestCase
         $ref->setAccessible(true);
         $loop = $ref->getValue($executor);
 
-        $this->assertInstanceOf('React\EventLoop\LoopInterface', $loop);
+        $this->assertInstanceOf(LoopInterface::class, $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverAddressIsInvalid()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new TcpTransportExecutor('///', $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverAddressContainsHostname()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new TcpTransportExecutor('localhost', $loop);
     }
 
     public function testCtorShouldThrowWhenNameserverSchemeIsInvalid()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         new TcpTransportExecutor('udp://1.2.3.4', $loop);
     }
 
     public function testQueryRejectsIfMessageExceedsMaximumMessageSize()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->never())->method('addWriteStream');
 
         $executor = new TcpTransportExecutor('8.8.8.8:53', $loop);
@@ -111,17 +116,13 @@ class TcpTransportExecutorTest extends TestCase
         });
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for '. $query->name . ' (A) failed: Query too large for TCP transport', $exception->getMessage());
     }
 
     public function testQueryRejectsIfServerConnectionFails()
     {
-        if (defined('HHVM_VERSION')) {
-            $this->markTestSkipped('HHVM reports different error message for invalid addresses');
-        }
-
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->never())->method('addWriteStream');
 
         $executor = new TcpTransportExecutor('::1', $loop);
@@ -139,19 +140,19 @@ class TcpTransportExecutorTest extends TestCase
         });
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Unable to connect to DNS server /// (Failed to parse address "///")', $exception->getMessage());
     }
 
     public function testQueryRejectsOnCancellationWithoutClosingSocketButStartsIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->never())->method('removeWriteStream');
         $loop->expects($this->never())->method('addReadStream');
         $loop->expects($this->never())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->anything())->willReturn($timer);
         $loop->expects($this->never())->method('cancelTimer');
 
@@ -170,19 +171,19 @@ class TcpTransportExecutorTest extends TestCase
         });
 
         /** @var \React\Dns\Query\CancellationException $exception */
-        $this->assertInstanceOf('React\Dns\Query\CancellationException', $exception);
+        $this->assertInstanceOf(CancellationException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) has been cancelled', $exception->getMessage());
     }
 
     public function testTriggerIdleTimerAfterQueryRejectedOnCancellationWillCloseSocket()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->never())->method('addReadStream');
         $loop->expects($this->never())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $timerCallback = null;
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->callback(function ($cb) use (&$timerCallback) {
             $timerCallback = $cb;
@@ -199,7 +200,7 @@ class TcpTransportExecutorTest extends TestCase
         $promise = $executor->query($query);
         $promise->cancel();
 
-        $this->assertInstanceOf('React\Promise\PromiseInterface', $promise);
+        $this->assertInstanceOf(PromiseInterface::class, $promise);
         $promise->then(null, $this->expectCallableOnce());
 
         // trigger idle timer
@@ -209,7 +210,7 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryRejectsOnCancellationWithoutClosingSocketAndWithoutStartingIdleTimerWhenOtherQueryIsStillPending()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->never())->method('removeWriteStream');
         $loop->expects($this->never())->method('addReadStream');
@@ -234,7 +235,7 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryAgainAfterPreviousWasCancelledReusesExistingSocket()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->never())->method('removeWriteStream');
         $loop->expects($this->never())->method('addReadStream');
@@ -266,20 +267,20 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.01));
+        await(sleep(0.01));
         if ($exception === null) {
-            \React\Async\await(\React\Promise\Timer\sleep(0.2));
+            await(sleep(0.2));
         }
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Unable to connect to DNS server tcp://127.0.0.1:1 (Connection refused)', $exception->getMessage());
         $this->assertEquals(defined('SOCKET_ECONNREFUSED') ? SOCKET_ECONNREFUSED : 111, $exception->getCode());
     }
 
     public function testQueryStaysPendingWhenClientCanNotSendExcessiveMessageInOneChunk()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->never())->method('removeWriteStream');
@@ -322,7 +323,7 @@ class TcpTransportExecutorTest extends TestCase
             $this->markTestSkipped('Skipped on macOS due to possible race condition');
         }
 
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->never())->method('removeWriteStream');
@@ -356,7 +357,7 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryRejectsWhenClientKeepsSendingWhenServerClosesSocketWithoutCallingCustomErrorHandler()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->once())->method('removeWriteStream');
@@ -403,11 +404,11 @@ class TcpTransportExecutorTest extends TestCase
         restore_error_handler();
         $this->assertNull($error);
 
-        // expect EPIPE (Broken pipe), except for macOS kernel race condition or legacy HHVM
-        $this->setExpectedException(
-            'RuntimeException',
+        // expect EPIPE (Broken pipe), except for macOS kernel race condition
+        $this->expectException(
+            \RuntimeException::class,
             'Unable to send query to DNS server tcp://' . $address . ' (',
-            defined('SOCKET_EPIPE') && !defined('HHVM_VERSION') ? (PHP_OS !== 'Darwin' || $writePending ? SOCKET_EPIPE : SOCKET_EPROTOTYPE) : null
+            defined('SOCKET_EPIPE') ? (PHP_OS !== 'Darwin' || $writePending ? SOCKET_EPIPE : SOCKET_EPROTOTYPE) : null
         );
         throw $exception;
     }
@@ -436,13 +437,13 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.01));
+        await(sleep(0.01));
         if ($exception === null) {
-            \React\Async\await(\React\Promise\Timer\sleep(0.2));
+            await(sleep(0.2));
         }
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Connection to DNS server tcp://' . $address . ' lost', $exception->getMessage());
     }
 
@@ -474,7 +475,7 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.2));
+        await(sleep(0.2));
         $this->assertTrue($wait);
 
         $this->assertNotNull($client);
@@ -510,7 +511,7 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.2));
+        await(sleep(0.2));
         $this->assertTrue($wait);
 
         $this->assertNotNull($client);
@@ -545,13 +546,13 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.01));
+        await(sleep(0.01));
         if ($exception === null) {
-            \React\Async\await(\React\Promise\Timer\sleep(0.2));
+            await(sleep(0.2));
         }
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Invalid message received from DNS server tcp://' . $address, $exception->getMessage());
     }
 
@@ -597,13 +598,13 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.01));
+        await(sleep(0.01));
         if ($exception === null) {
-            \React\Async\await(\React\Promise\Timer\sleep(0.2));
+            await(sleep(0.2));
         }
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Invalid response message received from DNS server tcp://' . $address, $exception->getMessage());
     }
 
@@ -649,13 +650,13 @@ class TcpTransportExecutorTest extends TestCase
             }
         );
 
-        \React\Async\await(\React\Promise\Timer\sleep(0.01));
+        await(sleep(0.01));
         if ($exception === null) {
-            \React\Async\await(\React\Promise\Timer\sleep(0.2));
+            await(sleep(0.2));
         }
 
         /** @var \RuntimeException $exception */
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for google.com (A) failed: Invalid response message received from DNS server tcp://' . $address, $exception->getMessage());
     }
 
@@ -684,14 +685,14 @@ class TcpTransportExecutorTest extends TestCase
         $query = new Query('google.com', Message::TYPE_A, Message::CLASS_IN);
 
         $promise = $executor->query($query);
-        $response = \React\Async\await(\React\Promise\Timer\timeout($promise, 0.2));
+        $response = await(timeout($promise, 0.2));
 
-        $this->assertInstanceOf('React\Dns\Model\Message', $response);
+        $this->assertInstanceOf(Message::class, $response);
     }
 
     public function testQueryRejectsIfSocketIsClosedAfterPreviousQueryThatWasStillPending()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->exactly(2))->method('addWriteStream');
         $loop->expects($this->exactly(2))->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
@@ -725,7 +726,7 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryResolvesIfServerSendsBackResponseMessageAndWillStartIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
@@ -758,13 +759,13 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryResolvesIfServerSendsBackResponseMessageAfterCancellingQueryAndWillStartIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->never())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->anything())->willReturn($timer);
         $loop->expects($this->never())->method('cancelTimer');
 
@@ -793,7 +794,7 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryResolvesIfServerSendsBackResponseMessageAfterCancellingOtherQueryAndWillStartIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
@@ -829,13 +830,13 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testTriggerIdleTimerAfterPreviousQueryResolvedWillCloseIdleSocketConnection()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->once())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $timerCallback = null;
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->callback(function ($cb) use (&$timerCallback) {
             $timerCallback = $cb;
@@ -871,13 +872,13 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testClosingConnectionAfterPreviousQueryResolvedWillCancelIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->once())->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->once())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->anything())->willReturn($timer);
         $loop->expects($this->once())->method('cancelTimer')->with($timer);
 
@@ -909,13 +910,13 @@ class TcpTransportExecutorTest extends TestCase
 
     public function testQueryAgainAfterPreviousQueryResolvedWillReuseSocketAndCancelIdleTimer()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
         $loop->expects($this->exactly(2))->method('addWriteStream');
         $loop->expects($this->once())->method('removeWriteStream');
         $loop->expects($this->once())->method('addReadStream');
         $loop->expects($this->never())->method('removeReadStream');
 
-        $timer = $this->getMockBuilder('React\EventLoop\TimerInterface')->getMock();
+        $timer = $this->createMock(TimerInterface::class);
         $loop->expects($this->once())->method('addTimer')->with(0.001, $this->anything())->willReturn($timer);
         $loop->expects($this->once())->method('cancelTimer')->with($timer);
 

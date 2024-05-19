@@ -14,7 +14,7 @@ if (!$config->nameservers) {
 $factory = new Factory();
 $resolver = $factory->create($config);
 
-$name = isset($argv[1]) ? $argv[1] : 'www.google.com';
+$name = $argv[1] ?? 'www.google.com';
 
 $resolver->resolveAll($name, Message::TYPE_A)->then(function (array $ips) use ($name) {
     echo 'IPv4 addresses for ' . $name . ': ' . implode(', ', $ips) . PHP_EOL;

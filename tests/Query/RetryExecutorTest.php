@@ -2,15 +2,18 @@
 
 namespace React\Tests\Dns\Query;
 
-use React\Tests\Dns\TestCase;
-use React\Dns\Query\RetryExecutor;
-use React\Dns\Query\Query;
 use React\Dns\Model\Message;
-use React\Dns\Query\TimeoutException;
 use React\Dns\Model\Record;
-use React\Promise;
-use React\Promise\Deferred;
 use React\Dns\Query\CancellationException;
+use React\Dns\Query\ExecutorInterface;
+use React\Dns\Query\Query;
+use React\Dns\Query\RetryExecutor;
+use React\Dns\Query\TimeoutException;
+use React\Promise\Deferred;
+use React\Promise\PromiseInterface;
+use React\Tests\Dns\TestCase;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 
 class RetryExecutorTest extends TestCase
 {
@@ -24,7 +27,7 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnValue($this->expectPromiseOnce()));
 
         $retryExecutor = new RetryExecutor($executor, 2);
@@ -45,13 +48,13 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->exactly(2))
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->onConsecutiveCalls(
                 $this->returnCallback(function ($query) {
-                    return Promise\reject(new TimeoutException("timeout"));
+                    return reject(new TimeoutException("timeout"));
                 }),
                 $this->returnCallback(function ($query) use ($response) {
-                    return Promise\resolve($response);
+                    return resolve($response);
                 })
             ));
 
@@ -59,7 +62,7 @@ class RetryExecutorTest extends TestCase
         $callback
             ->expects($this->once())
             ->method('__invoke')
-            ->with($this->isInstanceOf('React\Dns\Model\Message'));
+            ->with($this->isInstanceOf(Message::class));
 
         $errorback = $this->expectCallableNever();
 
@@ -79,9 +82,9 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->exactly(3))
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
-                return Promise\reject(new TimeoutException("timeout"));
+                return reject(new TimeoutException("timeout"));
             }));
 
         $retryExecutor = new RetryExecutor($executor, 2);
@@ -95,10 +98,10 @@ class RetryExecutorTest extends TestCase
         });
 
         assert($exception instanceof \RuntimeException);
-        $this->assertInstanceOf('RuntimeException', $exception);
+        $this->assertInstanceOf(\RuntimeException::class, $exception);
         $this->assertEquals('DNS query for igor.io (A) failed: too many retries', $exception->getMessage());
         $this->assertEquals(0, $exception->getCode());
-        $this->assertInstanceOf('React\Dns\Query\TimeoutException', $exception->getPrevious());
+        $this->assertInstanceOf(TimeoutException::class, $exception->getPrevious());
         $this->assertNotEquals('', $exception->getTraceAsString());
     }
 
@@ -112,9 +115,9 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
-                return Promise\reject(new \Exception);
+                return reject(new \Exception);
             }));
 
         $callback = $this->expectCallableNever();
@@ -123,7 +126,7 @@ class RetryExecutorTest extends TestCase
         $errorback
             ->expects($this->once())
             ->method('__invoke')
-            ->with($this->isInstanceOf('Exception'));
+            ->with($this->isInstanceOf(\Exception::class));
 
         $retryExecutor = new RetryExecutor($executor, 2);
 
@@ -143,7 +146,7 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) use (&$cancelled) {
                 $deferred = new Deferred(function ($resolve, $reject) use (&$cancelled) {
                     ++$cancelled;
@@ -179,7 +182,7 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->exactly(2))
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->onConsecutiveCalls(
                 $this->returnValue($deferred->promise()),
                 $this->returnCallback(function ($query) use (&$cancelled) {
@@ -221,8 +224,8 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
-            ->willReturn(Promise\resolve($this->createStandardResponse()));
+            ->with($this->isInstanceOf(Query::class))
+            ->willReturn(resolve($this->createStandardResponse()));
 
         $retryExecutor = new RetryExecutor($executor, 0);
 
@@ -250,8 +253,8 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->any())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
-            ->willReturn(Promise\reject(new TimeoutException("timeout")));
+            ->with($this->isInstanceOf(Query::class))
+            ->willReturn(reject(new TimeoutException("timeout")));
 
         $retryExecutor = new RetryExecutor($executor, 0);
 
@@ -285,7 +288,7 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->willReturn($deferred->promise());
 
         $retryExecutor = new RetryExecutor($executor, 0);
@@ -316,9 +319,9 @@ class RetryExecutorTest extends TestCase
         $executor
             ->expects($this->once())
             ->method('query')
-            ->with($this->isInstanceOf('React\Dns\Query\Query'))
+            ->with($this->isInstanceOf(Query::class))
             ->will($this->returnCallback(function ($query) {
-                return Promise\reject(new \Exception);
+                return reject(new \Exception);
             }));
 
         $retryExecutor = new RetryExecutor($executor, 2);
@@ -341,19 +344,19 @@ class RetryExecutorTest extends TestCase
         $mock
             ->expects($this->once())
             ->method('then')
-            ->will($this->returnValue(Promise\resolve($return)));
+            ->will($this->returnValue(resolve($return)));
 
         return $mock;
     }
 
     protected function createExecutorMock()
     {
-        return $this->getMockBuilder('React\Dns\Query\ExecutorInterface')->getMock();
+        return $this->createMock(ExecutorInterface::class);
     }
 
     protected function createPromiseMock()
     {
-        return $this->getMockBuilder('React\Promise\PromiseInterface')->getMock();
+        return $this->createMock(PromiseInterface::class);
     }
 
     protected function createStandardResponse()

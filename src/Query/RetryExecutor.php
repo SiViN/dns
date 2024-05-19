@@ -34,8 +34,7 @@ final class RetryExecutor implements ExecutorInterface
             $deferred->resolve($value);
         };
 
-        $executor = $this->executor;
-        $errorback = function ($e) use ($deferred, &$promise, $query, $success, &$errorback, &$retries, $executor) {
+        $errorback = function ($e) use ($deferred, &$promise, $query, $success, &$errorback, &$retries) {
             if (!$e instanceof TimeoutException) {
                 $errorback = null;
                 $deferred->reject($e);
@@ -49,7 +48,7 @@ final class RetryExecutor implements ExecutorInterface
 
                 // avoid garbage references by replacing all closures in call stack.
                 // what a lovely piece of code!
-                $r = new \ReflectionProperty('Exception', 'trace');
+                $r = new \ReflectionProperty(\Exception::class, 'trace');
                 $r->setAccessible(true);
                 $trace = $r->getValue($e);
 
@@ -68,7 +67,7 @@ final class RetryExecutor implements ExecutorInterface
                 $r->setValue($e, $trace);
             } else {
                 --$retries;
-                $promise = $executor->query($query)->then(
+                $promise = $this->executor->query($query)->then(
                     $success,
                     $errorback
                 );

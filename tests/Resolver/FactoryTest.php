@@ -2,9 +2,21 @@
 
 namespace React\Tests\Dns\Resolver;
 
+use React\Cache\ArrayCache;
+use React\Cache\CacheInterface;
 use React\Dns\Config\Config;
+use React\Dns\Query\CachingExecutor;
+use React\Dns\Query\CoopExecutor;
 use React\Dns\Query\HostsFileExecutor;
+use React\Dns\Query\FallbackExecutor;
+use React\Dns\Query\RetryExecutor;
+use React\Dns\Query\SelectiveTransportExecutor;
+use React\Dns\Query\TcpTransportExecutor;
+use React\Dns\Query\TimeoutExecutor;
+use React\Dns\Query\UdpTransportExecutor;
 use React\Dns\Resolver\Factory;
+use React\Dns\Resolver\Resolver;
+use React\EventLoop\LoopInterface;
 use React\Tests\Dns\TestCase;
 
 class FactoryTest extends TestCase
@@ -15,34 +27,34 @@ class FactoryTest extends TestCase
         $factory = new Factory();
         $resolver = $factory->create('8.8.8.8:53');
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
     }
 
     /** @test */
     public function createWithoutSchemeShouldCreateResolverWithSelectiveUdpAndTcpExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
         $resolver = $factory->create('8.8.8.8:53', $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $selectiveExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\SelectiveTransportExecutor', $selectiveExecutor);
+        $this->assertInstanceOf(SelectiveTransportExecutor::class, $selectiveExecutor);
 
         // udp below:
 
@@ -50,13 +62,13 @@ class FactoryTest extends TestCase
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($selectiveExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $udpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\UdpTransportExecutor', $udpExecutor);
+        $this->assertInstanceOf(UdpTransportExecutor::class, $udpExecutor);
 
         // tcp below:
 
@@ -64,85 +76,85 @@ class FactoryTest extends TestCase
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($selectiveExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
     }
 
     /** @test */
     public function createWithUdpSchemeShouldCreateResolverWithUdpExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
         $resolver = $factory->create('udp://8.8.8.8:53', $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $udpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\UdpTransportExecutor', $udpExecutor);
+        $this->assertInstanceOf(UdpTransportExecutor::class, $udpExecutor);
     }
 
     /** @test */
     public function createWithTcpSchemeShouldCreateResolverWithTcpExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
         $resolver = $factory->create('tcp://8.8.8.8:53', $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
     }
 
     /** @test */
     public function createWithConfigWithTcpNameserverSchemeShouldCreateResolverWithTcpExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $config = new Config();
         $config->nameservers[] = 'tcp://8.8.8.8:53';
@@ -150,35 +162,35 @@ class FactoryTest extends TestCase
         $factory = new Factory();
         $resolver = $factory->create($config, $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
     }
 
     /** @test */
     public function createWithConfigWithTwoNameserversWithTcpSchemeShouldCreateResolverWithFallbackExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $config = new Config();
         $config->nameservers[] = 'tcp://8.8.8.8:53';
@@ -187,35 +199,35 @@ class FactoryTest extends TestCase
         $factory = new Factory();
         $resolver = $factory->create($config, $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $fallbackExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\FallbackExecutor', $fallbackExecutor);
+        $this->assertInstanceOf(FallbackExecutor::class, $fallbackExecutor);
 
         $ref = new \ReflectionProperty($fallbackExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
 
         $ref = new \ReflectionProperty($tcpExecutor, 'nameserver');
         $ref->setAccessible(true);
@@ -227,13 +239,13 @@ class FactoryTest extends TestCase
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
 
         $ref = new \ReflectionProperty($tcpExecutor, 'nameserver');
         $ref->setAccessible(true);
@@ -245,7 +257,7 @@ class FactoryTest extends TestCase
     /** @test */
     public function createWithConfigWithThreeNameserversWithTcpSchemeShouldCreateResolverWithNestedFallbackExecutorStack()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $config = new Config();
         $config->nameservers[] = 'tcp://8.8.8.8:53';
@@ -255,35 +267,35 @@ class FactoryTest extends TestCase
         $factory = new Factory();
         $resolver = $factory->create($config, $loop);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
 
         $coopExecutor = $this->getResolverPrivateExecutor($resolver);
 
-        $this->assertInstanceOf('React\Dns\Query\CoopExecutor', $coopExecutor);
+        $this->assertInstanceOf(CoopExecutor::class, $coopExecutor);
 
         $ref = new \ReflectionProperty($coopExecutor, 'executor');
         $ref->setAccessible(true);
         $retryExecutor = $ref->getValue($coopExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\RetryExecutor', $retryExecutor);
+        $this->assertInstanceOf(RetryExecutor::class, $retryExecutor);
 
         $ref = new \ReflectionProperty($retryExecutor, 'executor');
         $ref->setAccessible(true);
         $fallbackExecutor = $ref->getValue($retryExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\FallbackExecutor', $fallbackExecutor);
+        $this->assertInstanceOf(FallbackExecutor::class, $fallbackExecutor);
 
         $ref = new \ReflectionProperty($fallbackExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
 
         $ref = new \ReflectionProperty($tcpExecutor, 'nameserver');
         $ref->setAccessible(true);
@@ -295,19 +307,19 @@ class FactoryTest extends TestCase
         $ref->setAccessible(true);
         $fallbackExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\FallbackExecutor', $fallbackExecutor);
+        $this->assertInstanceOf(FallbackExecutor::class, $fallbackExecutor);
 
         $ref = new \ReflectionProperty($fallbackExecutor, 'executor');
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
 
         $ref = new \ReflectionProperty($tcpExecutor, 'nameserver');
         $ref->setAccessible(true);
@@ -319,13 +331,13 @@ class FactoryTest extends TestCase
         $ref->setAccessible(true);
         $timeoutExecutor = $ref->getValue($fallbackExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TimeoutExecutor', $timeoutExecutor);
+        $this->assertInstanceOf(TimeoutExecutor::class, $timeoutExecutor);
 
         $ref = new \ReflectionProperty($timeoutExecutor, 'executor');
         $ref->setAccessible(true);
         $tcpExecutor = $ref->getValue($timeoutExecutor);
 
-        $this->assertInstanceOf('React\Dns\Query\TcpTransportExecutor', $tcpExecutor);
+        $this->assertInstanceOf(TcpTransportExecutor::class, $tcpExecutor);
 
         $ref = new \ReflectionProperty($tcpExecutor, 'nameserver');
         $ref->setAccessible(true);
@@ -337,36 +349,36 @@ class FactoryTest extends TestCase
     /** @test */
     public function createShouldThrowWhenNameserverIsInvalid()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         $factory->create('///', $loop);
     }
 
     /** @test */
     public function createShouldThrowWhenConfigHasNoNameservers()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
 
-        $this->setExpectedException('UnderflowException');
+        $this->expectException(\UnderflowException::class);
         $factory->create(new Config(), $loop);
     }
 
     /** @test */
     public function createShouldThrowWhenConfigHasInvalidNameserver()
     {
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
 
         $config = new Config();
         $config->nameservers[] = '///';
 
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(\InvalidArgumentException::class);
         $factory->create($config, $loop);
     }
 
@@ -376,25 +388,25 @@ class FactoryTest extends TestCase
         $factory = new Factory();
         $resolver = $factory->createCached('8.8.8.8:53');
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
         $executor = $this->getResolverPrivateExecutor($resolver);
-        $this->assertInstanceOf('React\Dns\Query\CachingExecutor', $executor);
+        $this->assertInstanceOf(CachingExecutor::class, $executor);
         $cache = $this->getCachingExecutorPrivateMemberValue($executor, 'cache');
-        $this->assertInstanceOf('React\Cache\ArrayCache', $cache);
+        $this->assertInstanceOf(ArrayCache::class, $cache);
     }
 
     /** @test */
     public function createCachedShouldCreateResolverWithCachingExecutorWithCustomCache()
     {
-        $cache = $this->getMockBuilder('React\Cache\CacheInterface')->getMock();
-        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+        $cache = $this->createMock(CacheInterface::class);
+        $loop = $this->createMock(LoopInterface::class);
 
         $factory = new Factory();
         $resolver = $factory->createCached('8.8.8.8:53', $loop, $cache);
 
-        $this->assertInstanceOf('React\Dns\Resolver\Resolver', $resolver);
+        $this->assertInstanceOf(Resolver::class, $resolver);
         $executor = $this->getResolverPrivateExecutor($resolver);
-        $this->assertInstanceOf('React\Dns\Query\CachingExecutor', $executor);
+        $this->assertInstanceOf(CachingExecutor::class, $executor);
         $cacheProperty = $this->getCachingExecutorPrivateMemberValue($executor, 'cache');
         $this->assertSame($cache, $cacheProperty);
     }
@@ -405,7 +417,7 @@ class FactoryTest extends TestCase
 
         // extract underlying executor that may be wrapped in multiple layers of hosts file executors
         while ($executor instanceof HostsFileExecutor) {
-            $reflector = new \ReflectionProperty('React\Dns\Query\HostsFileExecutor', 'fallback');
+            $reflector = new \ReflectionProperty(HostsFileExecutor::class, 'fallback');
             $reflector->setAccessible(true);
 
             $executor = $reflector->getValue($executor);
@@ -416,14 +428,14 @@ class FactoryTest extends TestCase
 
     private function getResolverPrivateMemberValue($resolver, $field)
     {
-        $reflector = new \ReflectionProperty('React\Dns\Resolver\Resolver', $field);
+        $reflector = new \ReflectionProperty(Resolver::class, $field);
         $reflector->setAccessible(true);
         return $reflector->getValue($resolver);
     }
 
     private function getCachingExecutorPrivateMemberValue($resolver, $field)
     {
-        $reflector = new \ReflectionProperty('React\Dns\Query\CachingExecutor', $field);
+        $reflector = new \ReflectionProperty(CachingExecutor::class, $field);
         $reflector->setAccessible(true);
         return $reflector->getValue($resolver);
     }
