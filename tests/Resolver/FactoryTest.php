@@ -399,6 +399,32 @@ class FactoryTest extends TestCase
         $this->assertSame($cache, $cacheProperty);
     }
 
+    /** @test */
+    public function createThrowsExceptionForInvalidLoop()
+    {
+        $this->setExpectedException('InvalidArgumentException', 'Argument #2 ($loop) expected null|React\EventLoop\LoopInterface');
+        $factory = new Factory();
+        $factory->create('config', 'loop');
+    }
+
+    /** @test */
+    public function createCachedThrowsExceptionForInvalidLoop()
+    {
+        $this->setExpectedException('InvalidArgumentException', 'Argument #2 ($loop) expected null|React\EventLoop\LoopInterface');
+        $factory = new Factory();
+        $factory->createCached('config', 'loop');
+    }
+
+    /** @test */
+    public function createCachedThrowsExceptionForInvalidCache()
+    {
+        $loop = $this->getMockBuilder('React\EventLoop\LoopInterface')->getMock();
+
+        $this->setExpectedException('InvalidArgumentException', 'Argument #3 ($cache) expected null|React\Cache\CacheInterface');
+        $factory = new Factory();
+        $factory->createCached('config', $loop, 'cache');
+    }
+
     private function getResolverPrivateExecutor($resolver)
     {
         $executor = $this->getResolverPrivateMemberValue($resolver, 'executor');

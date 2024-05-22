@@ -375,4 +375,11 @@ class UdpTransportExecutorTest extends TestCase
 
         $this->assertInstanceOf('React\Dns\Model\Message', $response);
     }
+
+    /** @test */
+    public function constructorThrowsExceptionForInvalidLoop()
+    {
+        $this->setExpectedException('InvalidArgumentException', 'Argument #2 ($loop) expected null|React\EventLoop\LoopInterface');
+        new UdpTransportExecutor('udp://127.0.0.1:53', 'loop');
+    }
 }

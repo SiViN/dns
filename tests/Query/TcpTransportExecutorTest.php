@@ -943,4 +943,11 @@ class TcpTransportExecutorTest extends TestCase
         // trigger second query
         $executor->query($query);
     }
+
+    /** @test */
+    public function constructorThrowsExceptionForInvalidLoop()
+    {
+        $this->setExpectedException('InvalidArgumentException', 'Argument #2 ($loop) expected null|React\EventLoop\LoopInterface');
+        new TcpTransportExecutor('tcp://127.0.0.1:53', 'loop');
+    }
 }
