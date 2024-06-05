@@ -185,4 +185,11 @@ class TimeoutExecutorTest extends TestCase
         $this->assertInstanceOf('React\Dns\Query\TimeoutException', $exception);
         $this->assertEquals('DNS query for igor.io (A) timed out' , $exception->getMessage());
     }
+
+    /** @test */
+    public function constructorThrowsExceptionForInvalidLoop()
+    {
+        $this->setExpectedException('InvalidArgumentException', 'Argument #3 ($loop) expected null|React\EventLoop\LoopInterface');
+        new TimeoutExecutor($this->executor, 5.0, 'loop');
+    }
 }
